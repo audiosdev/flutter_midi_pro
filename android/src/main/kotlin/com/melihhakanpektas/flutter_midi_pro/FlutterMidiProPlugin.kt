@@ -31,6 +31,10 @@ class FlutterMidiProPlugin: FlutterPlugin, MethodCallHandler {
 
     @JvmStatic
     private external fun unloadSoundfont(sfId: Int)
+
+    @JvmStatic
+    private external fun tuneNotes(sfId: Int, key: Int, tune: Double)
+  
     @JvmStatic
     private external fun dispose()
   }
