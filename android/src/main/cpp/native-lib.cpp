@@ -3,11 +3,13 @@
 #include <unistd.h>
 #include <map>
 
+define PLAYER_COUNT 84
 fluid_settings_t* settings = new_fluid_settings();
 std::map<int, fluid_synth_t*> synths = {};
 std::map<int, fluid_audio_driver_t*> drivers = {};
 std::map<int, int> soundfonts = {};
 int nextSfId = 1;
+static double mNoteTunes[PLAYER_COUNT];
 
 extern "C" JNIEXPORT int JNICALL
 Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_loadSoundfont(JNIEnv* env, jclass clazz, jstring path, jint bank, jint program) {
@@ -59,4 +61,14 @@ Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_dispose(JNIEnv
     drivers.clear();
     soundfonts.clear();
     delete_fluid_settings(settings);
+}
+
+extern "C" JNIEXPORT
+void JNICALL Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_tuneNotes(JNIEnv *jEnv, jclass type,
+                                                                          jint key, jdouble tune) {
+    mNoteTunes[key] = tune;
+
+    fluid_synth_activate_octave_tuning(synths[sfId], 0, 0, "tuning", mNoteTunes, 1);
+    fluid_synth_activate_tuning(synths[sfId], 14, 0, 0, 1);
+    fluid_synth_activate_tuning(synths[sfId], 15, 0, 0, 1);
 }
