@@ -51,6 +51,18 @@ Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_unloadSoundfon
     soundfonts.erase(sfId);
 }
 
+
+extern "C" JNIEXPORT
+void JNICALL Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_tuneNotes(JNIEnv *jEnv, jclass type,
+                                                                          jint key, jdouble tune) {
+    mNoteTunes[key] = tune;
+
+    fluid_synth_activate_octave_tuning(synths[sfId], 0, 0, "tuning", mNoteTunes, 1);
+    fluid_synth_activate_tuning(synths[sfId], 14, 0, 0, 1);
+    fluid_synth_activate_tuning(synths[sfId], 15, 0, 0, 1);
+}
+
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_dispose(JNIEnv* env, jclass clazz) {
     for (auto const& x : synths) {
@@ -61,14 +73,4 @@ Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_dispose(JNIEnv
     drivers.clear();
     soundfonts.clear();
     delete_fluid_settings(settings);
-}
-
-extern "C" JNIEXPORT
-void JNICALL Java_com_melihhakanpektas_flutter_1midi_1pro_FlutterMidiProPlugin_tuneNotes(JNIEnv *jEnv, jclass type,
-                                                                          jint key, jdouble tune) {
-    mNoteTunes[key] = tune;
-
-    fluid_synth_activate_octave_tuning(synths[sfId], 0, 0, "tuning", mNoteTunes, 1);
-    fluid_synth_activate_tuning(synths[sfId], 14, 0, 0, 1);
-    fluid_synth_activate_tuning(synths[sfId], 15, 0, 0, 1);
 }
