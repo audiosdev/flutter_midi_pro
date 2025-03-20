@@ -115,6 +115,19 @@ class FlutterMidiProPlugin: FlutterPlugin, MethodCallHandler {
     }
   }
 
+    "tuneNotes" -> {
+        val sfId = call.argument<Int>("sfId")
+        val key = call.argument<Int>("key")
+        val tune = call.argument<Double>("tune")
+
+        if (sfId != null && key != null && tune != null) {
+          tuneNotes(sfId, key, tune)
+          result.success(null)
+        } else {
+          result.error("INVALID_ARGUMENT", "sfId is required", null)
+        }
+      }
+
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
   }
