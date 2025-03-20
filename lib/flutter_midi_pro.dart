@@ -117,7 +117,7 @@ class MidiPro {
     required int key,
 
     /// tune
-    required double tune = 0,
+    required double tune,
 
   }) async {
     return FlutterMidiProPlatform.instance.tuneNotes(sfId, key, tune);
