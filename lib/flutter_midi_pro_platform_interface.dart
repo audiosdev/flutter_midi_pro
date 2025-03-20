@@ -32,6 +32,10 @@ abstract class FlutterMidiProPlatform extends PlatformInterface {
     throw UnimplementedError('unloadSoundfont() has not been implemented.');
   }
 
+  Future<void> tuneNotes(int sfId, int key, double tune) {
+    throw UnimplementedError('selectInstrument() has not been implemented.');
+  }
+  
   Future<void> dispose() {
     throw UnimplementedError('dispose() has not been implemented.');
   }
