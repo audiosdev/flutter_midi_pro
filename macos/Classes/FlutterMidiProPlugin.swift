@@ -98,6 +98,25 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         soundfontSamplers.removeValue(forKey: sfId)
         soundfontURLs.removeValue(forKey: sfId)
         result(nil)
+
+   case "tuneNotes":
+        let args = call.arguments as! [String: Any]
+        let sfId = args["sfId"] as! Int
+        let key = args["key"] as! Int
+        let tune = args["tune"] as! Double
+
+        let soundfontSampler = soundfontSamplers[sfId]![channel]
+        let soundfontUrl = soundfontURLs[sfId]!
+        do {
+            try soundfontSampler.loadSoundBankInstrument(at: soundfontUrl, program: UInt8(program), bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB), bankLSB: UInt8(bank))
+        } catch {
+            result(FlutterError(code: "SOUND_FONT_LOAD_FAILED", message: "Failed to load soundfont", details: nil))
+            return
+        }
+        soundfontSampler.sendProgramChange(UInt8(program), bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB), bankLSB: UInt8(bank), onChannel: UInt8(channel))
+        result(nil)
+
+      
     case "dispose":
         audioEngines.forEach { (key, value) in
             value.forEach { (audioEngine) in
