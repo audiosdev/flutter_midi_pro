@@ -105,21 +105,19 @@ case "tuneNotes":
     let key = args["key"] as! Int
     let tune = args["tune"] as! Double
 
-    guard let soundfontSamplers = soundfontSamplers[sfId], !soundfontSamplers.isEmpty else {
+    guard let samplers = soundfontSamplers[sfId] else {
         result(FlutterError(code: "SOUND_FONT_NOT_FOUND", message: "Soundfont not found", details: nil))
         return
     }
 
-    let semitoneRange: Double = 2.0  // Default pitch bend range is ±2 semitones
-
-    // Convert tuning value to pitch bend range (-8192 to 8191)
+    let semitoneRange: Double = 2.0  // Default pitch bend range ±2 semitones
     let bendValue = Int32((tune / semitoneRange) * 8192.0)
-    let bendLSB = UInt8(bendValue & 0x7F)  // Least Significant Byte
+    let bendLSB = UInt8(bendValue & 0x7F)   // Least Significant Byte
     let bendMSB = UInt8((bendValue >> 7) & 0x7F) // Most Significant Byte
 
-    // Apply tuning to **all** channels (since we don't know the exact channel)
-    for (channel, sampler) in soundfontSamplers.enumerated() {
-        sampler.sendMIDIEvent(0xE0 | UInt8(channel), bendLSB, bendMSB)
+    // Apply pitch bend to all available channels
+    for (channel, sampler) in samplers.enumerated() {
+        sampler.sendMIDIEvent(0xE0 | UInt8(channel), data1: bendLSB, data2: bendMSB)
     }
 
     result(nil)
