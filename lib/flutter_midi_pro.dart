@@ -106,6 +106,9 @@ class MidiPro {
     return FlutterMidiProPlatform.instance.unloadSoundfont(sfId);
   }
 
+    Future<void> tuneNotes(int sfId) async {
+    return FlutterMidiProPlatform.instance.unloadSoundfont(sfId);
+  }
   /// Disposes of the FlutterMidiPro instance.
   /// This should be called when the instance is no longer needed.
   /// This will stop all notes and unload all soundfonts.
