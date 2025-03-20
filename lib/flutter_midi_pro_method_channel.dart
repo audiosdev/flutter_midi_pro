@@ -37,6 +37,13 @@ class MethodChannelFlutterMidiPro extends FlutterMidiProPlatform {
   }
 
   @override
+  Future<void> tuneNotes(int sfId, int key, double tune) async {
+    await _channel.invokeMethod(
+        'tuneNotes', {'sfId': sfId, 'key': key, 'tune': tune});
+  }
+
+  
+  @override
   Future<void> dispose() async {
     await _channel.invokeMethod('dispose');
   }
