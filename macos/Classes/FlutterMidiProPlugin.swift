@@ -110,27 +110,30 @@ case "tuneNotes":
         return
     }
 
-    // Ensure the tune value is within the expected range
+    // Ensure the tune value is within the expected range of -12 to 12 semitones
     let clampedTune = max(-12.0, min(12.0, tune))
 
-    // Calculate the pitch bend value with higher precision
-    let pitchBendFactor = 16383.0 / 24.0 // Full MIDI range / full tune range (24 semitones)
-    let midiPitchBendValue = clampedTune * pitchBendFactor + 8192.0
+    // Calculate the pitch bend value in MIDI units, with 12 semitones as the range
+    let pitchBendFactor = 8192.0 / 12.0 // MIDI pitch bend range (8192) divided by the semitone range (12)
+    let midiPitchBendValue = clampedTune * pitchBendFactor + 8192.0 // Centered at 8192 (no pitch bend)
 
     // Round to the nearest integer for MIDI
     let roundedPitchBendValue = round(midiPitchBendValue)
 
-    // Clamp to MIDI pitch bend range
+    // Clamp to MIDI pitch bend range (0 to 16383)
     let clampedMidiBendValue = UInt16(max(0.0, min(16383.0, roundedPitchBendValue)))
 
-    let bendLSB = UInt8(clampedMidiBendValue & 0x7F)
-    let bendMSB = UInt8((clampedMidiBendValue >> 7) & 0x7F)
+    // Split into LSB and MSB for MIDI message
+    let bendLSB = UInt8(clampedMidiBendValue & 0x7F)  // Lower 7 bits
+    let bendMSB = UInt8((clampedMidiBendValue >> 7) & 0x7F)  // Upper 7 bits
 
+    // Send MIDI pitch bend event for each sampler
     for (channel, sampler) in samplers.enumerated() {
         sampler.sendMIDIEvent(0xE0 | UInt8(channel), data1: bendLSB, data2: bendMSB)
     }
 
     result(nil)
+
       
     case "dispose":
         audioEngines.forEach { (key, value) in
