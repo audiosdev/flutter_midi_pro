@@ -6,7 +6,6 @@ import CoreAudio
 
 public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
     // Store FluidSynth instances
-    var fluidSynths: [Int: UnsafeMutablePointer<fluid_synth_t>] = [:]
 
     // Audio engines and samplers
     var audioEngines: [Int: [AVAudioEngine]] = [:]
