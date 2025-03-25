@@ -101,6 +101,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
+
     let args = call.arguments as! [String: Any]
     let sfId = args["sfId"] as! Int
     let tune = args["tune"] as! Double
@@ -113,9 +114,11 @@ case "tuneNotes":
     // Ensure the tune value is within the expected range of -12 to 12 semitones
     let clampedTune = max(-12.0, min(12.0, tune))
 
+    // Correct pitch bend factor: MIDI pitch bend range (16383) divided by 24 semitones
+    let pitchBendFactor = 16383.0 / 24.0  // MIDI pitch bend range divided by 24 semitones
+
     // Calculate the pitch bend value in MIDI units, with 12 semitones as the range
-    let pitchBendFactor = 8192.0 / 12.0 // MIDI pitch bend range (8192) divided by the semitone range (12)
-    let midiPitchBendValue = clampedTune * pitchBendFactor + 8192.0 // Centered at 8192 (no pitch bend)
+    let midiPitchBendValue = clampedTune * pitchBendFactor + 8192.0  // Centered at 8192 (no pitch bend)
 
     // Round to the nearest integer for MIDI
     let roundedPitchBendValue = round(midiPitchBendValue)
@@ -133,6 +136,8 @@ case "tuneNotes":
     }
 
     result(nil)
+
+
 
       
     case "dispose":
