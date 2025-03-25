@@ -5,11 +5,15 @@ import AVFoundation
 import CoreAudio
 
 public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
+  // Store FluidSynth instances by SoundFont ID
+  var fluidSynths: [Int: UnsafeMutablePointer<fluid_synth_t>] = [:]
+  
+  // Store Audio Engine, Samplers, and SoundFont URLs
   var audioEngines: [Int: [AVAudioEngine]] = [:]
   var soundfontIndex = 1
   var soundfontSamplers: [Int: [AVAudioUnitSampler]] = [:]
   var soundfontURLs: [Int: URL] = [:]
-  
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "flutter_midi_pro", binaryMessenger: registrar.messenger)
     let instance = FlutterMidiProPlugin()
@@ -24,6 +28,12 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         let bank = args["bank"] as! Int
         let program = args["program"] as! Int
         let url = URL(fileURLWithPath: path)
+
+        // Initialize FluidSynth instance for this SoundFont
+        let settings = new_fluid_settings()
+        let synth = new_fluid_synth(settings)
+        fluidSynths[soundfontIndex] = synth // Store the FluidSynth instance for later use
+
         var chSamplers: [AVAudioUnitSampler] = []
         var chAudioEngines: [AVAudioEngine] = []
         for _ in 0...15 {
@@ -51,6 +61,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         audioEngines[soundfontIndex] = chAudioEngines
         soundfontIndex += 1
         result(soundfontIndex-1)
+
     case "selectInstrument":
         let args = call.arguments as! [String: Any]
         let sfId = args["sfId"] as! Int
@@ -67,6 +78,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         }
         soundfontSampler.sendProgramChange(UInt8(program), bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB), bankLSB: UInt8(bank), onChannel: UInt8(channel))
         result(nil)
+
     case "playNote":
         let args = call.arguments as! [String: Any]
         let channel = args["channel"] as! Int
@@ -76,6 +88,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         let soundfontSampler = soundfontSamplers[sfId]![channel]
         soundfontSampler.startNote(UInt8(note), withVelocity: UInt8(velocity), onChannel: UInt8(channel))
         result(nil)
+
     case "stopNote":
         let args = call.arguments as! [String: Any]
         let channel = args["channel"] as! Int
@@ -83,6 +96,8 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         let sfId = args["sfId"] as! Int
         let soundfontSampler = soundfontSamplers[sfId]![channel]
         soundfontSampler.stopNote(UInt8(note), onChannel: UInt8(channel))
+        result(nil)
+
     case "unloadSoundfont":
         let args = call.arguments as! [String:Any]
         let sfId = args["sfId"] as! Int
@@ -99,31 +114,31 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         soundfontURLs.removeValue(forKey: sfId)
         result(nil)
 
-case "tuneNotes":
-    let args = call.arguments as! [String: Any]
-    let sfId = args["sfId"] as! Int
-    let key = args["key"] as! Int
-    let tune = args["tune"] as! Double
+    case "tuneNotes":
+        let args = call.arguments as! [String: Any]
+        let sfId = args["sfId"] as! Int
+        let key = args["key"] as! Int
+        let tune = args["tune"] as! Double
 
-    guard let synth = fluidSynths[sfId] else {
-        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "FluidSynth instance not found", details: nil))
-        return
-    }
+        // Ensure FluidSynth instance exists for this SoundFont ID
+        guard let synth = fluidSynths[sfId] else {
+            result(FlutterError(code: "SYNTH_NOT_FOUND", message: "FluidSynth instance not found", details: nil))
+            return
+        }
 
-    var noteTunings = [Float](repeating: 0.0, count: 128) // Default tuning (no change)
-    noteTunings[key] = Float(tune) // Apply tuning offset for the specific note
+        var noteTunings = [Float](repeating: 0.0, count: 128) // Default tuning (no change)
+        noteTunings[key] = Float(tune) // Apply tuning offset for the specific note
 
-    // Apply per-note tuning using standard FluidSynth method
-    let tuningName = "custom_tuning"
-    fluid_synth_tune_notes(synth, 0, tuningName, &noteTunings, 128) // 0 = tuning bank
+        // Apply per-note tuning using standard FluidSynth method
+        let tuningName = "custom_tuning"
+        fluid_synth_tune_notes(synth, 0, tuningName, &noteTunings, 128) // 0 = tuning bank
 
-    // Activate the tuning on MIDI channels to match Android
-    fluid_synth_activate_tuning(synth, 0, 0, 1)  // Channel 0
-    fluid_synth_activate_tuning(synth, 14, 0, 1) // Channel 14
-    fluid_synth_activate_tuning(synth, 15, 0, 1) // Channel 15
+        // Activate the tuning on MIDI channels to match Android
+        fluid_synth_activate_tuning(synth, 0, 0, 1)  // Channel 0
+        fluid_synth_activate_tuning(synth, 14, 0, 1) // Channel 14
+        fluid_synth_activate_tuning(synth, 15, 0, 1) // Channel 15
 
-    result(nil)
-
+        result(nil)
 
     case "dispose":
         audioEngines.forEach { (key, value) in
@@ -134,9 +149,9 @@ case "tuneNotes":
         audioEngines = [:]
         soundfontSamplers = [:]
         result(nil)
+
     default:
-      result(FlutterMethodNotImplemented)
-        break
+        result(FlutterMethodNotImplemented)
     }
   }
 }
