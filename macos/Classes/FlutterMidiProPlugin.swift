@@ -105,23 +105,24 @@ case "tuneNotes":
     let key = args["key"] as! Int
     let tune = args["tune"] as! Double
 
-    guard let samplers = soundfontSamplers[sfId] else {
-        result(FlutterError(code: "SOUND_FONT_NOT_FOUND", message: "Soundfont not found", details: nil))
+    guard let synth = fluidSynths[sfId] else {
+        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "FluidSynth instance not found", details: nil))
         return
     }
 
-    let semitoneRange: Double = 2.0  // Default pitch bend range ±2 semitones
-    let bendValue = Int32((tune / semitoneRange) * 8192.0)
-    let bendLSB = UInt8(bendValue & 0x7F)   // Least Significant Byte
-    let bendMSB = UInt8((bendValue >> 7) & 0x7F) // Most Significant Byte
+    var noteTunings = [Float](repeating: 0.0, count: 128) // Default tuning (no change)
+    noteTunings[key] = Float(tune) // Apply tuning offset for the specific note
 
-    // Apply pitch bend to all available channels
-    for (channel, sampler) in samplers.enumerated() {
-        sampler.sendMIDIEvent(0xE0 | UInt8(channel), data1: bendLSB, data2: bendMSB)
-    }
+    // Apply per-note tuning using standard FluidSynth method
+    let tuningName = "custom_tuning"
+    fluid_synth_tune_notes(synth, 0, tuningName, &noteTunings, 128) // 0 = tuning bank
+
+    // Activate the tuning on MIDI channels to match Android
+    fluid_synth_activate_tuning(synth, 0, 0, 1)  // Channel 0
+    fluid_synth_activate_tuning(synth, 14, 0, 1) // Channel 14
+    fluid_synth_activate_tuning(synth, 15, 0, 1) // Channel 15
 
     result(nil)
-
       
     case "dispose":
         audioEngines.forEach { (key, value) in
