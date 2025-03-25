@@ -103,7 +103,8 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 case "tuneNotes":
     let args = call.arguments as! [String: Any]
     let sfId = args["sfId"] as! Int
-    let tune = args["tune"] as! Double  // We don't need 'key' anymore since it's not being used
+    let key = args["key"] as! Int   // Key, might be used for specific note tuning
+    let tune = args["tune"] as! Double  // The tuning value in the range -12.0 to 12.0
 
     // Fetch the corresponding sampler for the provided soundfont ID
     guard let samplers = soundfontSamplers[sfId] else {
@@ -111,22 +112,24 @@ case "tuneNotes":
         return
     }
 
-    // The tuning value ranges from -12.0 to 12.0 semitones, and we want to map it to a ±2 semitone range (±8192 in MIDI).
-    let maxTuneValue: Double = 12.0 // The tune value range is from -12.0 to 12.0
-    let midiPitchBendMax = 8192.0  // MIDI pitch bend range is ±8192
+    // The pitch bend range in MIDI is -8192 to 8192
+    // You need to scale the tuning value (which is between -12.0 to 12.0) to fit within the MIDI pitch bend range.
+    let pitchBendMax = 8192.0  // MIDI pitch bend range
+    let tuneValue = tune / 12.0 * pitchBendMax  // Map the tuning value to MIDI's -8192 to 8192 range
 
-    // Scale the tune value to fit within the MIDI pitch bend range
-    let bendValue = Int32((tune / maxTuneValue) * midiPitchBendMax)  // Convert the tune value to MIDI pitch bend value
-    let bendLSB = UInt8(bendValue & 0x7F)   // Least Significant Byte
-    let bendMSB = UInt8((bendValue >> 7) & 0x7F)  // Most Significant Byte
+    // MIDI pitch bend is split into two parts: MSB (Most Significant Byte) and LSB (Least Significant Byte)
+    let bendValue = Int32(tuneValue)  // Convert the tuning value to an integer for MIDI pitch bend
+    let bendLSB = UInt8(bendValue & 0x7F)  // Least Significant Byte (7 bits)
+    let bendMSB = UInt8((bendValue >> 7) & 0x7F)  // Most Significant Byte (7 bits)
 
-    // Apply pitch bend to the specific key on each sampler channel
+    // Apply pitch bend to the specific key (note) on each sampler channel
     for (channel, sampler) in samplers.enumerated() {
         // Send the pitch bend message for the specific key (note) to the sampler
         sampler.sendMIDIEvent(0xE0 | UInt8(channel), data1: bendLSB, data2: bendMSB)
     }
 
     result(nil)
+
 
     case "dispose":
         audioEngines.forEach { (key, value) in
