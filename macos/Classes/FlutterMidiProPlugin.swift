@@ -105,27 +105,19 @@ case "tuneNotes":
     let key = args["key"] as! Int
     let tune = args["tune"] as! Double
 
-    // Ensure the FluidSynth instance is available
     guard let synth = fluidSynths[sfId] else {
         result(FlutterError(code: "SYNTH_NOT_FOUND", message: "FluidSynth instance not found", details: nil))
         return
     }
 
-    // Ensure the tune value is within the range of -12.0 to 12.0 semitones
-    let clampedTune = max(-12.0, min(12.0, tune))
+    var noteTunings = [Float](repeating: 0.0, count: 128) // Default tuning (no change)
+    noteTunings[key] = Float(tune) // Apply tuning offset for the specific note
 
-    // Convert semitones to cents (1 semitone = 100 cents)
-    let tuneInCents = Float(clampedTune * 100.0)
-
-    // Default tuning array (all notes at 0 cents tuning)
-    var noteTunings = [Float](repeating: 0.0, count: 128)
-    noteTunings[key] = tuneInCents // Apply tuning to specific note (key)
-
-    // Apply per-note tuning using FluidSynth's method
-    let tuningName = "custom_tuning" // You can use a custom tuning name if needed
+    // Apply per-note tuning using standard FluidSynth method
+    let tuningName = "custom_tuning"
     fluid_synth_tune_notes(synth, 0, tuningName, &noteTunings, 128) // 0 = tuning bank
 
-    // Activate tuning on MIDI channels, similar to Android
+    // Activate the tuning on MIDI channels to match Android
     fluid_synth_activate_tuning(synth, 0, 0, 1)  // Channel 0
     fluid_synth_activate_tuning(synth, 14, 0, 1) // Channel 14
     fluid_synth_activate_tuning(synth, 15, 0, 1) // Channel 15
