@@ -103,7 +103,6 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 case "tuneNotes":
     let args = call.arguments as! [String: Any]
     let sfId = args["sfId"] as! Int
-    let key = args["key"] as! Int
     let tune = args["tune"] as! Double
 
     guard let samplers = soundfontSamplers[sfId] else {
@@ -111,19 +110,21 @@ case "tuneNotes":
         return
     }
 
-    let pitchBendFactor = 8192.0 / 12.0
-    var midiPitchBendValue = tune * pitchBendFactor + 8192.0
+    // Ensure the tune value is within the expected range
+    let clampedTune = max(-12.0, min(12.0, tune))
 
-    // Round the value before conversion to UInt16
-    midiPitchBendValue = round(midiPitchBendValue)
+    // Calculate the pitch bend value with higher precision
+    let pitchBendFactor = 16383.0 / 24.0 // Full MIDI range / full tune range (24 semitones)
+    let midiPitchBendValue = clampedTune * pitchBendFactor + 8192.0
 
-    // Clamp the value to the MIDI pitch bend range
-    midiPitchBendValue = max(0.0, min(16383.0, midiPitchBendValue))
+    // Round to the nearest integer for MIDI
+    let roundedPitchBendValue = round(midiPitchBendValue)
 
-    let bendValue = UInt16(midiPitchBendValue)
+    // Clamp to MIDI pitch bend range
+    let clampedMidiBendValue = UInt16(max(0.0, min(16383.0, roundedPitchBendValue)))
 
-    let bendLSB = UInt8(bendValue & 0x7F)
-    let bendMSB = UInt8((bendValue >> 7) & 0x7F)
+    let bendLSB = UInt8(clampedMidiBendValue & 0x7F)
+    let bendMSB = UInt8((clampedMidiBendValue >> 7) & 0x7F)
 
     for (channel, sampler) in samplers.enumerated() {
         sampler.sendMIDIEvent(0xE0 | UInt8(channel), data1: bendLSB, data2: bendMSB)
