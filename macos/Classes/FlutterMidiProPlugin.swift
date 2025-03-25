@@ -112,13 +112,15 @@ case "tuneNotes":
         return
     }
 
-    // The MIDI pitch bend range is -8192 to 8192
-    // Map the tune value (-12.0 to 12.0) to MIDI's -8192 to 8192 range
-    let tuneRange = 8192.0 / 12.0  // Mapping factor for semitone range to pitch bend range
-    let tuneValue = tune * tuneRange  // Convert the tuning value (in semitones) to the MIDI pitch bend value
+    // Mapping factor: 8192 MIDI pitch bend range / 12.0 semitone range
+    let pitchBendFactor = 8192.0 / 12.0  // 683.5 MIDI units per semitone
 
-    // MIDI pitch bend is split into two parts: MSB (Most Significant Byte) and LSB (Least Significant Byte)
-    let bendValue = Int32(tuneValue)  // Convert the tuning value to an integer for MIDI pitch bend
+    // Calculate the corresponding pitch bend value from the tune
+    // The formula for pitch bend conversion from semitone value is:
+    let pitchBendValue = tune * pitchBendFactor
+
+    // MIDI pitch bend is divided into two parts: MSB (Most Significant Byte) and LSB (Least Significant Byte)
+    let bendValue = Int32(pitchBendValue)  // Convert the pitch bend to an integer
     let bendLSB = UInt8(bendValue & 0x7F)  // Least Significant Byte (7 bits)
     let bendMSB = UInt8((bendValue >> 7) & 0x7F)  // Most Significant Byte (7 bits)
 
@@ -129,6 +131,7 @@ case "tuneNotes":
     }
 
     result(nil)
+
 
 
     case "dispose":
