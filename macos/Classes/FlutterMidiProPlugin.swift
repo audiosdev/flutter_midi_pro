@@ -103,8 +103,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 case "tuneNotes":
     let args = call.arguments as! [String: Any]
     let sfId = args["sfId"] as! Int
-    let key = args["key"] as! Int
-    let tune = args["tune"] as! Double
+    let tune = args["tune"] as! Double  // We don't need 'key' anymore since it's not being used
 
     // Fetch the corresponding sampler for the provided soundfont ID
     guard let samplers = soundfontSamplers[sfId] else {
@@ -113,7 +112,6 @@ case "tuneNotes":
     }
 
     // The tuning value ranges from -12.0 to 12.0 semitones, and we want to map it to a ±2 semitone range (±8192 in MIDI).
-    let semitoneRange: Double = 2.0  // ±2 semitones range for MIDI pitch bend
     let maxTuneValue: Double = 12.0 // The tune value range is from -12.0 to 12.0
     let midiPitchBendMax = 8192.0  // MIDI pitch bend range is ±8192
 
@@ -129,6 +127,7 @@ case "tuneNotes":
     }
 
     result(nil)
+
     case "dispose":
         audioEngines.forEach { (key, value) in
             value.forEach { (audioEngine) in
