@@ -112,10 +112,10 @@ case "tuneNotes":
         return
     }
 
-    // The pitch bend range in MIDI is -8192 to 8192
-    // You need to scale the tuning value (which is between -12.0 to 12.0) to fit within the MIDI pitch bend range.
-    let pitchBendMax = 8192.0  // MIDI pitch bend range
-    let tuneValue = tune / 12.0 * pitchBendMax  // Map the tuning value to MIDI's -8192 to 8192 range
+    // The MIDI pitch bend range is -8192 to 8192
+    // Map the tune value (-12.0 to 12.0) to MIDI's -8192 to 8192 range
+    let tuneRange = 8192.0 / 12.0  // Mapping factor for semitone range to pitch bend range
+    let tuneValue = tune * tuneRange  // Convert the tuning value (in semitones) to the MIDI pitch bend value
 
     // MIDI pitch bend is split into two parts: MSB (Most Significant Byte) and LSB (Least Significant Byte)
     let bendValue = Int32(tuneValue)  // Convert the tuning value to an integer for MIDI pitch bend
