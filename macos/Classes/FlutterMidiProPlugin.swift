@@ -114,11 +114,11 @@ case "tuneNotes":
     // Ensure the tune value is within the expected range of -12 to 12 semitones
     let clampedTune = max(-12.0, min(12.0, tune))
 
-    // Correct pitch bend factor: 8192 corresponds to +12 semitones, -8192 corresponds to -12 semitones
-    let pitchBendFactor = 8192.0 / 12.0  // MIDI pitch bend range for 12 semitones
+    // Correct pitch bend factor: 16383 / 24 corresponds to 1 semitone.
+    let pitchBendFactor = 16383.0 / 24.0  // Total MIDI pitch bend range divided by 24 semitones
 
     // Calculate the pitch bend value in MIDI units, with 12 semitones as the range
-    let midiPitchBendValue = clampedTune * pitchBendFactor + 8192.0  // Centered at 8192 (no pitch bend)
+    let midiPitchBendValue = (clampedTune + 12) * pitchBendFactor  // Centered at 8192 for no pitch bend
 
     // Round to the nearest integer for MIDI
     let roundedPitchBendValue = round(midiPitchBendValue)
