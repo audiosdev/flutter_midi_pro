@@ -101,11 +101,11 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
-
     let args = call.arguments as! [String: Any]
+    
     let sfId = args["sfId"] as! Int
     let tune = args["tune"] as! Double
-
+    
     guard let samplers = soundfontSamplers[sfId] else {
         result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont not found", details: nil))
         return
@@ -114,26 +114,27 @@ case "tuneNotes":
     // Ensure the tune value is within the expected range of -12 to 12 semitones
     let clampedTune = max(-12.0, min(12.0, tune))
 
-    // Correct pitch bend factor: Scale semitones to MIDI range (0-16383) for ±12 semitones
-    let pitchBendValue = ((clampedTune + 12.0) / 24.0) * 16383.0
-
-    // Round to the nearest integer for MIDI
-    let roundedPitchBendValue = round(pitchBendValue)
-
-    // Clamp to MIDI pitch bend range (0 to 16383)
-    let clampedMidiBendValue = UInt16(max(0.0, min(16383.0, roundedPitchBendValue)))
-
-    // Split into LSB and MSB for MIDI message
-    let bendLSB = UInt8(clampedMidiBendValue & 0x7F)  // Lower 7 bits
-    let bendMSB = UInt8((clampedMidiBendValue >> 7) & 0x7F)  // Upper 7 bits
-
-    // Send MIDI pitch bend event for each sampler
+    // We now use a MIDI Note On/Off event to transpose the notes directly.
+    // Iterate through each sampler and apply transposition
     for (channel, sampler) in samplers.enumerated() {
-        sampler.sendMIDIEvent(0xE0 | UInt8(channel), data1: bendLSB, data2: bendMSB)
+        // Assuming `sendNoteEvent` is a function to send MIDI note events:
+        // Transpose the note by adjusting its pitch directly.
+        
+        // Calculate the new transposed MIDI note value.
+        // Assuming the note starts at a default pitch (e.g., MIDI note 60 is Middle C)
+        let baseMIDI = 60 // Middle C as an example (can vary depending on your system)
+        let transposedMIDI = baseMIDI + Int(clampedTune)
+
+        // Send transposed note events (note on and note off)
+        // Send Note On event
+        sampler.sendNoteEvent(note: UInt8(transposedMIDI), velocity: 127, channel: UInt8(channel), isOn: true)
+        
+        // Optionally, send a Note Off event after a delay to stop the note
+        // In a real-world scenario, you would have to know when to stop the note.
+        sampler.sendNoteEvent(note: UInt8(transposedMIDI), velocity: 0, channel: UInt8(channel), isOn: false)
     }
 
     result(nil)
-
       
     case "dispose":
         audioEngines.forEach { (key, value) in
