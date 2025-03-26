@@ -102,10 +102,9 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 
 case "tuneNotes":
     let args = call.arguments as! [String: Any]
-    
     let sfId = args["sfId"] as! Int
     let tune = args["tune"] as! Double
-    
+
     guard let samplers = soundfontSamplers[sfId] else {
         result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont not found", details: nil))
         return
@@ -114,24 +113,9 @@ case "tuneNotes":
     // Ensure the tune value is within the expected range of -12 to 12 semitones
     let clampedTune = max(-12.0, min(12.0, tune))
 
-    // We now use a MIDI Note On/Off event to transpose the notes directly.
-    // Iterate through each sampler and apply transposition
-    for (channel, sampler) in samplers.enumerated() {
-        // Assuming `sendNoteEvent` is a function to send MIDI note events:
-        // Transpose the note by adjusting its pitch directly.
-        
-        // Calculate the new transposed MIDI note value.
-        // Assuming the note starts at a default pitch (e.g., MIDI note 60 is Middle C)
-        let baseMIDI = 60 // Middle C as an example (can vary depending on your system)
-        let transposedMIDI = baseMIDI + Int(clampedTune)
-
-        // Send transposed note events (note on and note off)
-        // Send Note On event
-        sampler.sendNoteEvent(note: UInt8(transposedMIDI), velocity: 127, channel: UInt8(channel), isOn: true)
-        
-        // Optionally, send a Note Off event after a delay to stop the note
-        // In a real-world scenario, you would have to know when to stop the note.
-        sampler.sendNoteEvent(note: UInt8(transposedMIDI), velocity: 0, channel: UInt8(channel), isOn: false)
+    // Apply the transpose directly to the samplers
+    for (_, sampler) in samplers.enumerated() {
+        sampler.globalTuning = Float(clampedTune * 100.0) // 100 cents per semitone
     }
 
     result(nil)
