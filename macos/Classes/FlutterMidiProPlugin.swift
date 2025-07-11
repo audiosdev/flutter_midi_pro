@@ -5,7 +5,8 @@ import AVFoundation
 public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
     // Constants
     let NOTES_PER_OCTAVE = 12
-    let CHANNELS_PER_SF = 16 // MIDI has 16 channels per soundfont
+    let CHANNELS_PER_SF = 16
+    let MAX_BEND_CENTS = 200.0 // ±200 cents = ±2 semitones
     
     // Audio components
     var audioEngines: [Int: AVAudioEngine] = [:]
@@ -13,7 +14,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
     var soundfontSamplers: [Int: [AVAudioUnitSampler]] = [:]
     var soundfontURLs: [Int: URL] = [:]
     
-    // Tuning storage: [sfId: [noteClass: tune]]
+    // Tuning storage: [sfId: [noteClass: tuneInCents]]
     var noteTunings = [Int: [Int: Double]]() 
     
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -34,7 +35,6 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             let audioEngine = AVAudioEngine()
             var samplers: [AVAudioUnitSampler] = []
             
-            // Assign each note class (C, C#, D, etc.) to its own channel
             for noteClass in 0..<NOTES_PER_OCTAVE {
                 let sampler = AVAudioUnitSampler()
                 audioEngine.attach(sampler)
@@ -91,7 +91,6 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
                 return
             }
             
-            // Update all channels with the new instrument
             for (noteClass, sampler) in samplers.enumerated() {
                 do {
                     try sampler.loadSoundBankInstrument(
@@ -133,12 +132,10 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             let octave = note / NOTES_PER_OCTAVE
             let midiNote = UInt8(octave * NOTES_PER_OCTAVE + noteClass)
             
-            // Apply tuning if it exists for this note class
-            if let tune = noteTunings[sfId]?[noteClass] {
-                let clampedTune = min(max(tune, -2.0), 2.0)
-                let normalized = (clampedTune + 2.0) / 4.0
-                let bendValue = UInt16(normalized * 16383.0)
-                samplers[noteClass].sendPitchBend(bendValue, onChannel: UInt8(noteClass))
+            if let tuneCents = noteTunings[sfId]?[noteClass] {
+                applyTuning(sampler: samplers[noteClass], 
+                          noteClass: noteClass,
+                          tuneCents: tuneCents)
             }
             
             samplers[noteClass].startNote(midiNote, withVelocity: UInt8(velocity), onChannel: UInt8(noteClass))
@@ -181,7 +178,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             let args = call.arguments as! [String: Any]
             let sfId = args["sfId"] as! Int
             let key = args["key"] as! Int
-            let tune = args["tune"] as! Double
+            let tune = args["tune"] as! Double // Expected in cents
             
             let noteClass = key % NOTES_PER_OCTAVE
             
@@ -192,10 +189,9 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             
             // Immediately apply to the channel
             if let samplers = soundfontSamplers[sfId], noteClass < samplers.count {
-                let clampedTune = min(max(tune, -2.0), 2.0)
-                let normalized = (clampedTune + 2.0) / 4.0
-                let bendValue = UInt16(normalized * 16383.0)
-                samplers[noteClass].sendPitchBend(bendValue, onChannel: UInt8(noteClass))
+                applyTuning(sampler: samplers[noteClass],
+                          noteClass: noteClass,
+                          tuneCents: tune)
             }
             
             result(nil)
@@ -213,5 +209,12 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+    
+    private func applyTuning(sampler: AVAudioUnitSampler, noteClass: Int, tuneCents: Double) {
+        let clampedCents = min(max(tuneCents, -MAX_BEND_CENTS), MAX_BEND_CENTS)
+        let normalized = (clampedCents + MAX_BEND_CENTS) / (2.0 * MAX_BEND_CENTS)
+        let bendValue = UInt16(normalized * 16383.0)
+        sampler.sendPitchBend(bendValue, onChannel: UInt8(noteClass))
     }
 }
