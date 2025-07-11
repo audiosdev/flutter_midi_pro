@@ -10,7 +10,6 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
   var soundfontIndex = 1
   var soundfontSamplers: [Int: [AVAudioUnitSampler]] = [:]
   var soundfontURLs: [Int: URL] = [:]
-  var soundfontSamplers = [Int: [AVAudioUnitSampler]]()
   var noteTunes = [Int: Double]()
   
   public static func register(with registrar: FlutterPluginRegistrar) {
