@@ -101,31 +101,34 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
-   NSDictionary* args = call.arguments;
-    NSInteger sfId = [args[@"sfId"] integerValue];
-    NSInteger key = [args[@"key"] integerValue];
-    double tune = [args[@"tune"] doubleValue];
-    
-    if (!self.synths[@(sfId)]) {
-        result([FlutterError errorWithCode:@"SYNTH_NOT_FOUND" message:@"Soundfont not found" details:nil]);
-        return;
+    guard let args = call.arguments as? [String: Any],
+          let sfId = args["sfId"] as? Int,
+          let key = args["key"] as? Int,
+          let tune = args["tune"] as? Double else {
+        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments", details: nil))
+        return
     }
     
-    // Store the tune value for this note
-    self.noteTunes[@(key)] = @(tune);
+    guard let synth = synths[sfId] else {
+        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont not found", details: nil))
+        return
+    }
     
-    // Convert the dictionary to FluidSynth's expected format
-    double noteTunes[128] = {0};
-    for (NSNumber* note in self.noteTunes) {
-        noteTunes[note.integerValue] = [self.noteTunes[note] doubleValue];
+    // Store the tune value for this note (in semitones)
+    noteTunes[key] = tune
+    
+    // Convert to FluidSynth's expected format (cents)
+    var noteTunesInCents = [Double](repeating: 0, count: 128)
+    for (note, tuneValue) in noteTunes {
+        noteTunesInCents[note] = tuneValue * 100 // Convert semitones to cents
     }
     
     // Apply the tuning
-    fluid_synth_activate_octave_tuning(self.synths[@(sfId)], 0, 0, "tuning", noteTunes, 1);
-    fluid_synth_activate_tuning(self.synths[@(sfId)], 14, 0, 0, 1);
-    fluid_synth_activate_tuning(self.synths[@(sfId)], 15, 0, 0, 1);
+    fluid_synth_activate_octave_tuning(synth, 0, 0, "tuning", noteTunesInCents, 1)
+    fluid_synth_activate_tuning(synth, 14, 0, 0, 1)
+    fluid_synth_activate_tuning(synth, 15, 0, 0, 1)
     
-    result(nil);
+    result(nil)
       
     case "dispose":
         audioEngines.forEach { (key, value) in
