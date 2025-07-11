@@ -104,15 +104,17 @@ case "tuneNotes":
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
           let key = args["key"] as? Int,
-          let tune = args["tune"] as? Double,
-          let channel = args["channel"] as? Int else {
+          let tune = args["tune"] as? Double else {
         result(FlutterError(
             code: "INVALID_ARGUMENTS",
-            message: "Missing or invalid arguments. Required: sfId (Int), key (Int), tune (Double), channel (Int)",
+            message: "Missing or invalid arguments. Required: sfId (Int), key (Int), tune (Double)",
             details: nil
         ))
         return
     }
+    
+    // Default to channel 0 since it's not provided from Dart
+    let channel = 0
     
     // Validate soundfont exists
     guard let samplers = soundfontSamplers[sfId] else {
@@ -124,11 +126,11 @@ case "tuneNotes":
         return
     }
     
-    // Validate channel exists
-    guard channel >= 0 && channel < samplers.count else {
+    // Validate channel exists (using default channel 0)
+    guard channel < samplers.count else {
         result(FlutterError(
             code: "INVALID_CHANNEL",
-            message: "Channel \(channel) out of range (0-\(samplers.count-1))",
+            message: "Default channel 0 not available",
             details: nil
         ))
         return
@@ -140,7 +142,7 @@ case "tuneNotes":
     let clampedTune = min(max(tune, -2.0), 2.0)
     let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383)
     
-    // Apply pitch bend to the channel
+    // Apply pitch bend to the default channel (0)
     sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
     
     result(nil)
