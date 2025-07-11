@@ -119,12 +119,13 @@ case "tuneNotes":
     
     // Calculate pitch bend value (limited to ±2 semitones)
     let clampedTune = min(max(tune, -2.0), 2.0)
-    let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 8192 + 8192)  // Convert to MIDI bend range (0-16383)
+    let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383)  // Convert to MIDI bend range (0-16383)
     
-    // Apply pitch bend to the channel
+    // Start note with the pitch bend applied
     sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
     
     result(nil)
+      
     case "dispose":
         audioEngines.forEach { (key, value) in
             value.forEach { (audioEngine) in
