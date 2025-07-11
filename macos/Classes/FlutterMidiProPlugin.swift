@@ -103,15 +103,34 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 case "tuneNotes":
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
-          let _ = args["key"] as? Int,  // Note number is available if needed
+          let key = args["key"] as? Int,
           let tune = args["tune"] as? Double,
           let channel = args["channel"] as? Int else {
-        result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments", details: nil))
+        result(FlutterError(
+            code: "INVALID_ARGUMENTS",
+            message: "Missing or invalid arguments. Required: sfId (Int), key (Int), tune (Double), channel (Int)",
+            details: nil
+        ))
         return
     }
     
-    guard let samplers = soundfontSamplers[sfId], channel < samplers.count else {
-        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont or channel not found", details: nil))
+    // Validate soundfont exists
+    guard let samplers = soundfontSamplers[sfId] else {
+        result(FlutterError(
+            code: "SYNTH_NOT_FOUND",
+            message: "Soundfont with id \(sfId) not found",
+            details: nil
+        ))
+        return
+    }
+    
+    // Validate channel exists
+    guard channel >= 0 && channel < samplers.count else {
+        result(FlutterError(
+            code: "INVALID_CHANNEL",
+            message: "Channel \(channel) out of range (0-\(samplers.count-1))",
+            details: nil
+        ))
         return
     }
     
@@ -119,9 +138,9 @@ case "tuneNotes":
     
     // Calculate pitch bend value (±2 semitones range)
     let clampedTune = min(max(tune, -2.0), 2.0)
-    let bendValue = UInt16((clampedTune / 2.0 * 8192) + 8192)  // Center at 8192
+    let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383)
     
-    // Apply pitch bend to the entire channel
+    // Apply pitch bend to the channel
     sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
     
     result(nil)
