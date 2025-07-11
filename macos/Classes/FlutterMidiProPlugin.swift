@@ -110,7 +110,6 @@ case "tuneNotes":
         return
     }
     
-    // Validate the soundfont and channel exist
     guard let samplers = soundfontSamplers[sfId], channel < samplers.count else {
         result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont or channel not found", details: nil))
         return
@@ -118,24 +117,12 @@ case "tuneNotes":
     
     let sampler = samplers[channel]
     
-    // Create a tuning table if it doesn't exist
-    if sampler.value(forKey: "tuningTable") == nil {
-        let tuningTable = AKTuningTable()
-        sampler.setValue(tuningTable, forKey: "tuningTable")
-    }
+    // Calculate pitch bend value (limited to ±2 semitones)
+    let clampedTune = min(max(tune, -2.0), 2.0)
+    let bendValue = UInt14(Int((clampedTune / 2.0 + 0.5) * 8192))  // Convert to MIDI bend range (0-16383)
     
-    // Get the tuning table
-    guard let tuningTable = sampler.value(forKey: "tuningTable") as? AKTuningTable else {
-        result(FlutterError(code: "TUNING_ERROR", message: "Could not access tuning table", details: nil))
-        return
-    }
-    
-    // Calculate frequency based on tuning (A4 = 440Hz as reference)
-    let referenceFrequency = 440.0 * pow(2.0, (Double(key) - 69.0) / 12.0)
-    let tunedFrequency = referenceFrequency * pow(2.0, tune / 12.0)
-    
-    // Set the tuning for this specific note
-    tuningTable.tuneNote(noteNumber: key, toFrequency: Float(tunedFrequency))
+    // Apply pitch bend to the channel
+    sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
     
     result(nil)
       
