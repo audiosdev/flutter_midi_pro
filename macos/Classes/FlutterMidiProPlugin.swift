@@ -101,89 +101,70 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
-    // 1. More detailed argument parsing with debug logging
-    print("[MIDI] TuneNotes called with args: \(String(describing: call.arguments))")
+    // Debug logging
+    print("[MIDI] tuneNotes called with arguments: \(String(describing: call.arguments))")
     
+    // Argument validation
     guard let args = call.arguments as? [String: Any] else {
         let error = FlutterError(
-            code: "INVALID_ARGS_TYPE",
+            code: "INVALID_ARGUMENTS",
             message: "Arguments must be a dictionary",
-            details: ["received_type": type(of: call.arguments)]
+            details: ["type": type(of: call.arguments)]
         )
-        print("[MIDI] Error: \(error)")
+        print("[MIDI] Validation error: \(error)")
         result(error)
         return
     }
     
-    // 2. Validate each parameter separately with detailed errors
     guard let sfId = args["sfId"] as? Int else {
         let error = FlutterError(
             code: "INVALID_SFID",
             message: "sfId must be an Int",
-            details: ["received_value": args["sfId"], "expected_type": "Int"]
+            details: ["received": args["sfId"]]
         )
-        print("[MIDI] Error: \(error)")
+        print("[MIDI] Validation error: \(error)")
         result(error)
         return
     }
     
-    // Note: key is received but not used - this might be confusing
-    guard let _ = args["key"] as? Int else {
-        let error = FlutterError(
-            code: "INVALID_KEY",
-            message: "key must be an Int",
-            details: ["received_value": args["key"], "expected_type": "Int"]
-        )
-        print("[MIDI] Error: \(error)")
-        result(error)
-        return
-    }
+    // Note: key is received but not used in current implementation
+    _ = args["key"] as? Int  // Silencing unused warning
     
     guard let tune = args["tune"] as? Double else {
         let error = FlutterError(
             code: "INVALID_TUNE",
             message: "tune must be a Double",
-            details: ["received_value": args["tune"], "expected_type": "Double"]
+            details: ["received": args["tune"]]
         )
-        print("[MIDI] Error: \(error)")
+        print("[MIDI] Validation error: \(error)")
         result(error)
         return
     }
     
-    // 3. Thread safety - ensure we're on main thread for sampler access
+    // Ensure operation happens on main thread
     DispatchQueue.main.async {
-        // 4. Verify sampler dictionary state
-        print("[MIDI] Current soundfonts: \(self.soundfontSamplers.keys)")
+        // Debug current state
+        print("[MIDI] Current soundfonts: \(self.soundfontSamplers.keys.map { String($0) }.joined(separator: ", "))")
         
+        // Validate soundfont exists
         guard let samplers = self.soundfontSamplers[sfId] else {
             let error = FlutterError(
-                code: "SF_NOT_LOADED",
-                message: "Soundfont \(sfId) not loaded or already disposed",
-                details: ["loaded_sf_ids": Array(self.soundfontSamplers.keys)]
+                code: "SOUNDFONT_NOT_FOUND",
+                message: "Soundfont with ID \(sfId) not loaded",
+                details: ["available_soundfonts": Array(self.soundfontSamplers.keys)]
             )
             print("[MIDI] Error: \(error)")
             result(error)
             return
         }
         
-        let channel = 0 // Default channel
+        let channel = 0  // Default channel
         
-        // 5. Validate sampler array
-        guard !samplers.isEmpty else {
-            let error = FlutterError(
-                code: "NO_SAMPLERS",
-                message: "No samplers available for soundfont \(sfId)",
-                details: nil
-            )
-            print("[MIDI] Error: \(error)")
-            result(error)
-            return
-        }
-        
+        // Validate channel bounds
         guard channel >= 0, channel < samplers.count else {
             let error = FlutterError(
                 code: "INVALID_CHANNEL",
-                message: "Channel \(channel) out of bounds (0..<\(samplers.count))",
+                message: "Channel \(channel) is out of bounds (0..<\(samplers.count))",
                 details: nil
             )
             print("[MIDI] Error: \(error)")
@@ -193,22 +174,10 @@ case "tuneNotes":
         
         let sampler = samplers[channel]
         
-        // 6. Null check for sampler
-        if sampler == nil {
-            let error = FlutterError(
-                code: "NULL_SAMPLER",
-                message: "Sampler is null for sfId \(sfId) channel \(channel)",
-                details: nil
-            )
-            print("[MIDI] Error: \(error)")
-            result(error)
-            return
-        }
-        
-        // 7. Safer pitch bend calculation
+        // Calculate pitch bend value
         let clampedTune: Double
         if tune.isNaN || tune.isInfinite {
-            print("[MIDI] Warning: Received invalid tune value \(tune), using 0")
+            print("[MIDI] Warning: Invalid tune value \(tune), defaulting to 0")
             clampedTune = 0.0
         } else {
             clampedTune = min(max(tune, -2.0), 2.0)
@@ -217,22 +186,11 @@ case "tuneNotes":
         let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383.0)
         let safeBendValue = min(max(bendValue, 0), 16383)
         
-        print("[MIDI] Applying pitch bend: sfId=\(sfId), channel=\(channel), tune=\(tune) -> bendValue=\(safeBendValue)")
+        print("[MIDI] Applying pitch bend - SF: \(sfId), Channel: \(channel), Value: \(safeBendValue)")
         
-        // 8. Try-catch for MIDI operation
-        do {
-            try sampler.sendPitchBend(safeBendValue, onChannel: UInt8(channel))
-            print("[MIDI] Pitch bend applied successfully")
-            result(nil)
-        } catch {
-            let error = FlutterError(
-                code: "MIDI_ERROR",
-                message: "Failed to send pitch bend: \(error.localizedDescription)",
-                details: ["bend_value": safeBendValue, "channel": channel]
-            )
-            print("[MIDI] Error: \(error)")
-            result(error)
-        }
+        // Perform the MIDI operation
+        sampler.sendPitchBend(safeBendValue, onChannel: UInt8(channel))
+        result(nil)
     }
       
     case "dispose":
