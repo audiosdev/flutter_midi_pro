@@ -115,20 +115,7 @@ case "tuneNotes":
         return
     }
 
-    // Validate MIDI note range (0-127)
-    guard key >= 0 && key <= 127 else {
-        result(FlutterError(
-            code: "INVALID_NOTE",
-            message: "Key must be between 0 and 127",
-            details: nil
-        ))
-        return
-    }
-
     DispatchQueue.main.async {
-        // Store the tuning for this key
-        self.noteTunes[key] = tune
-        
         // Validate soundfont exists
         guard let samplers = self.soundfontSamplers[sfId] else {
             result(FlutterError(
@@ -139,28 +126,44 @@ case "tuneNotes":
             return
         }
 
-        // Apply tuning to all channels
-        for sampler in samplers {
-            // Convert semitones to cents (100 cents per semitone)
-            let tuneInCents = tune * 100.0
-            
-            // Calculate pitch bend value (±2 semitones range)
-            // MIDI pitch bend range is 0-16383 (center at 8192)
-            let normalized = (tune / 2.0) + 0.5  // Convert -2...+2 to 0...1
-            let bendValue = UInt16(normalized * 16383.0)
-            
-            // Apply to channel 0 (or modify as needed)
-            sampler.sendPitchBend(bendValue, onChannel: 0)
-            
-            print("""
-            Tuned note:
-            - Soundfont: \(sfId)
-            - Note: \(key)
-            - Tune: \(tune) semitones (\(tuneInCents) cents)
-            - Bend value: \(bendValue)
-            """)
-        }
+        let channel = 0  // Default channel
         
+        // Validate channel bounds
+        guard channel >= 0, channel < samplers.count else {
+            result(FlutterError(
+                code: "INVALID_CHANNEL",
+                message: "Channel \(channel) is out of bounds",
+                details: nil
+            ))
+            return
+        }
+
+        let sampler = samplers[channel]
+        
+        // SAFE pitch bend calculation
+        // 1. Clamp the input value first
+        let clampedTune = min(max(tune, -2.0), 2.0)
+        
+        // 2. Normalize to 0...1 range
+        let normalized = (clampedTune + 2.0) / 4.0
+        
+        // 3. Calculate bend value with bounds checking
+        let bendValueDouble = normalized * Double(UInt16.max)
+        let clampedBendValue = max(min(bendValueDouble, Double(UInt16.max)), 0)
+        let bendValue = UInt16(clampedBendValue.rounded())
+        
+        // Debug output
+        print("""
+        Applying pitch bend:
+        - Soundfont ID: \(sfId)
+        - Channel: \(channel)
+        - Original tune: \(tune)
+        - Clamped tune: \(clampedTune)
+        - Normalized: \(normalized)
+        - Calculated bend value: \(bendValue)
+        """)
+
+        sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
         result(nil)
     }
       
