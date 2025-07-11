@@ -102,10 +102,10 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
-    // Argument validation
+    // Argument validation (key is captured but not used)
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
-          let key = args["key"] as? Int,
+          let _ = args["key"] as? Int,  // Silenced unused warning
           let tune = args["tune"] as? Double else {
         result(FlutterError(
             code: "INVALID_ARGUMENTS",
@@ -141,15 +141,15 @@ case "tuneNotes":
         let sampler = samplers[channel]
         
         // SAFE pitch bend calculation
-        // 1. Clamp the input value first
+        // 1. Clamp the input value first (-2.0 to 2.0 semitones)
         let clampedTune = min(max(tune, -2.0), 2.0)
         
         // 2. Normalize to 0...1 range
         let normalized = (clampedTune + 2.0) / 4.0
         
         // 3. Calculate bend value with bounds checking
-        let bendValueDouble = normalized * Double(UInt16.max)
-        let clampedBendValue = max(min(bendValueDouble, Double(UInt16.max)), 0)
+        let bendValueDouble = normalized * 16383.0  // MIDI pitch bend range
+        let clampedBendValue = max(min(bendValueDouble, 16383.0), 0.0)
         let bendValue = UInt16(clampedBendValue.rounded())
         
         // Debug output
@@ -157,10 +157,10 @@ case "tuneNotes":
         Applying pitch bend:
         - Soundfont ID: \(sfId)
         - Channel: \(channel)
-        - Original tune: \(tune)
-        - Clamped tune: \(clampedTune)
-        - Normalized: \(normalized)
-        - Calculated bend value: \(bendValue)
+        - Original tune: \(tune) semitones
+        - Clamped tune: \(clampedTune) semitones
+        - Normalized value: \(normalized)
+        - Final bend value: \(bendValue)
         """)
 
         sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
