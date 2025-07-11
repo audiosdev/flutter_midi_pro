@@ -104,7 +104,7 @@ case "tuneNotes":
     // Argument validation
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
-          let _ = args["key"] as? Int,  // Silencing unused warning
+          let key = args["key"] as? Int,
           let tune = args["tune"] as? Double else {
         result(FlutterError(
             code: "INVALID_ARGUMENTS",
@@ -139,28 +139,35 @@ case "tuneNotes":
 
         let sampler = samplers[channel]
         
-        // Safer pitch bend calculation with bounds checking
-        let clampedTune = min(max(tune, -2.0), 2.0)
-        let normalizedTune = (clampedTune / 2.0) + 0.5  // Range 0.0...1.0
+        // Store the tuning for this key
+        self.noteTunes[key] = tune
         
-        // Ensure the value is within valid range before conversion
-        let boundedValue = max(min(normalizedTune * 16383.0, 16383.0), 0.0)
-        let bendValue = UInt16(boundedValue.rounded())
+        // Apply tuning to all channels (similar to JNI implementation)
+        for (_, sampler) in samplers.enumerated() {
+            // Convert tune from semitones to cents (FluidSynth uses cents)
+            let tuneInCents = tune * 100.0
+            
+            // Create tuning array for all keys (128 notes)
+            var tuning = [Double](repeating: 0.0, count: 128)
+            tuning[key] = tuneInCents
+            
+            // Apply the tuning (implementation depends on your audio engine)
+            sampler.applyKeyTuning(key: key, tuneInCents: tuneInCents)
+            
+            // Debug output
+            print("""
+            Tuning note:
+            - Soundfont ID: \(sfId)
+            - Channel: \(channel)
+            - Key: \(key)
+            - Tune (semitones): \(tune)
+            - Tune (cents): \(tuneInCents)
+            """)
+        }
         
-        // Debug output
-        print("""
-        Applying pitch bend:
-        - Soundfont ID: \(sfId)
-        - Channel: \(channel)
-        - Original tune: \(tune)
-        - Clamped tune: \(clampedTune)
-        - Calculated bend value: \(bendValue)
-        """)
-
-        sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
         result(nil)
     }
-      
+
     case "dispose":
         audioEngines.forEach { (key, value) in
             value.forEach { (audioEngine) in
