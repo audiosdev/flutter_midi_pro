@@ -104,29 +104,38 @@ case "tuneNotes":
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
           let key = args["key"] as? Int,
-          let tune = args["tune"] as? Double else {
+          let tune = args["tune"] as? Double,
+          let channel = args["channel"] as? Int else {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments", details: nil))
         return
     }
     
-    guard let synth = synths[sfId] else {
-        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont not found", details: nil))
+    // Validate the soundfont and channel exist
+    guard let samplers = soundfontSamplers[sfId], channel < samplers.count else {
+        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont or channel not found", details: nil))
         return
     }
     
-    // Store the tune value for this note (in semitones)
-    noteTunes[key] = tune
+    let sampler = samplers[channel]
     
-    // Convert to FluidSynth's expected format (cents)
-    var noteTunesInCents = [Double](repeating: 0, count: 128)
-    for (note, tuneValue) in noteTunes {
-        noteTunesInCents[note] = tuneValue * 100 // Convert semitones to cents
+    // Create a tuning table if it doesn't exist
+    if sampler.value(forKey: "tuningTable") == nil {
+        let tuningTable = AKTuningTable()
+        sampler.setValue(tuningTable, forKey: "tuningTable")
     }
     
-    // Apply the tuning
-    fluid_synth_activate_octave_tuning(synth, 0, 0, "tuning", noteTunesInCents, 1)
-    fluid_synth_activate_tuning(synth, 14, 0, 0, 1)
-    fluid_synth_activate_tuning(synth, 15, 0, 0, 1)
+    // Get the tuning table
+    guard let tuningTable = sampler.value(forKey: "tuningTable") as? AKTuningTable else {
+        result(FlutterError(code: "TUNING_ERROR", message: "Could not access tuning table", details: nil))
+        return
+    }
+    
+    // Calculate frequency based on tuning (A4 = 440Hz as reference)
+    let referenceFrequency = 440.0 * pow(2.0, (Double(key) - 69.0) / 12.0)
+    let tunedFrequency = referenceFrequency * pow(2.0, tune / 12.0)
+    
+    // Set the tuning for this specific note
+    tuningTable.tuneNote(noteNumber: key, toFrequency: Float(tunedFrequency))
     
     result(nil)
       
