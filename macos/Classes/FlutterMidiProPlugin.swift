@@ -1,16 +1,14 @@
 import FlutterMacOS
-import CoreMIDI
 import AVFAudio
 import AVFoundation
-import CoreAudio
 
 public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
     var audioEngines: [Int: [AVAudioEngine]] = [:]
     var soundfontIndex = 1
     var soundfontSamplers: [Int: [AVAudioUnitSampler]] = [:]
     var soundfontURLs: [Int: URL] = [:]
-    var noteTunes = [Int: Double]()
-    var activeNotes = [Int: [Int: UInt8]]()
+    var noteTunings = [Int: [Int: Double]]() // [sfId: [note: tune]]
+    var activeNotes = [Int: [Int: UInt8]]() // [sfId: [note: channel]]
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "flutter_midi_pro", binaryMessenger: registrar.messenger)
@@ -85,7 +83,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             
             let sampler = samplers[channel]
             
-            if let tune = noteTunes[note] {
+            if let tune = noteTunings[sfId]?[note] {
                 let clampedTune = min(max(tune, -2.0), 2.0)
                 let normalized = (clampedTune + 2.0) / 4.0
                 let bendValue = UInt16(normalized * 16383.0)
@@ -130,6 +128,8 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             audioEngines.removeValue(forKey: sfId)
             soundfontSamplers.removeValue(forKey: sfId)
             soundfontURLs.removeValue(forKey: sfId)
+            noteTunings.removeValue(forKey: sfId)
+            activeNotes.removeValue(forKey: sfId)
             result(nil)
             
         case "tuneNotes":
@@ -143,7 +143,10 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
                 return
             }
             
-            noteTunes[key] = tune
+            if noteTunings[sfId] == nil {
+                noteTunings[sfId] = [:]
+            }
+            noteTunings[sfId]?[key] = tune
             
             if let channel = activeNotes[sfId]?[key], 
                let samplers = soundfontSamplers[sfId],
@@ -167,7 +170,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
             audioEngines = [:]
             soundfontSamplers = [:]
             soundfontURLs = [:]
-            noteTunes = [:]
+            noteTunings = [:]
             activeNotes = [:]
             result(nil)
             
