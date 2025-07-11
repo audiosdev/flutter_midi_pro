@@ -101,95 +101,63 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
-    // Debug logging
-    print("[MIDI] tuneNotes called with arguments: \(String(describing: call.arguments))")
-    
     // Argument validation
-    guard let args = call.arguments as? [String: Any] else {
-        let error = FlutterError(
+    guard let args = call.arguments as? [String: Any],
+          let sfId = args["sfId"] as? Int,
+          let _ = args["key"] as? Int,  // Silencing unused warning
+          let tune = args["tune"] as? Double else {
+        result(FlutterError(
             code: "INVALID_ARGUMENTS",
-            message: "Arguments must be a dictionary",
-            details: ["type": type(of: call.arguments)]
-        )
-        print("[MIDI] Validation error: \(error)")
-        result(error)
+            message: "Required arguments: sfId (Int), key (Int), tune (Double)",
+            details: nil
+        ))
         return
     }
-    
-    guard let sfId = args["sfId"] as? Int else {
-        let error = FlutterError(
-            code: "INVALID_SFID",
-            message: "sfId must be an Int",
-            details: ["received": args["sfId"]]
-        )
-        print("[MIDI] Validation error: \(error)")
-        result(error)
-        return
-    }
-    
-    // Note: key is received but not used in current implementation
-    _ = args["key"] as? Int  // Silencing unused warning
-    
-    guard let tune = args["tune"] as? Double else {
-        let error = FlutterError(
-            code: "INVALID_TUNE",
-            message: "tune must be a Double",
-            details: ["received": args["tune"]]
-        )
-        print("[MIDI] Validation error: \(error)")
-        result(error)
-        return
-    }
-    
-    // Ensure operation happens on main thread
+
     DispatchQueue.main.async {
-        // Debug current state
-        print("[MIDI] Current soundfonts: \(self.soundfontSamplers.keys.map { String($0) }.joined(separator: ", "))")
-        
         // Validate soundfont exists
         guard let samplers = self.soundfontSamplers[sfId] else {
-            let error = FlutterError(
-                code: "SOUNDFONT_NOT_FOUND",
-                message: "Soundfont with ID \(sfId) not loaded",
-                details: ["available_soundfonts": Array(self.soundfontSamplers.keys)]
-            )
-            print("[MIDI] Error: \(error)")
-            result(error)
+            result(FlutterError(
+                code: "SYNTH_NOT_FOUND",
+                message: "Soundfont not found for ID: \(sfId)",
+                details: nil
+            ))
             return
         }
-        
+
         let channel = 0  // Default channel
         
         // Validate channel bounds
         guard channel >= 0, channel < samplers.count else {
-            let error = FlutterError(
+            result(FlutterError(
                 code: "INVALID_CHANNEL",
-                message: "Channel \(channel) is out of bounds (0..<\(samplers.count))",
+                message: "Channel \(channel) is out of bounds",
                 details: nil
-            )
-            print("[MIDI] Error: \(error)")
-            result(error)
+            ))
             return
         }
-        
+
         let sampler = samplers[channel]
         
-        // Calculate pitch bend value
-        let clampedTune: Double
-        if tune.isNaN || tune.isInfinite {
-            print("[MIDI] Warning: Invalid tune value \(tune), defaulting to 0")
-            clampedTune = 0.0
-        } else {
-            clampedTune = min(max(tune, -2.0), 2.0)
-        }
+        // Safer pitch bend calculation with bounds checking
+        let clampedTune = min(max(tune, -2.0), 2.0)
+        let normalizedTune = (clampedTune / 2.0) + 0.5  // Range 0.0...1.0
         
-        let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383.0)
-        let safeBendValue = min(max(bendValue, 0), 16383)
+        // Ensure the value is within valid range before conversion
+        let boundedValue = max(min(normalizedTune * 16383.0, 16383.0), 0.0)
+        let bendValue = UInt16(boundedValue.rounded())
         
-        print("[MIDI] Applying pitch bend - SF: \(sfId), Channel: \(channel), Value: \(safeBendValue)")
-        
-        // Perform the MIDI operation
-        sampler.sendPitchBend(safeBendValue, onChannel: UInt8(channel))
+        // Debug output
+        print("""
+        Applying pitch bend:
+        - Soundfont ID: \(sfId)
+        - Channel: \(channel)
+        - Original tune: \(tune)
+        - Clamped tune: \(clampedTune)
+        - Calculated bend value: \(bendValue)
+        """)
+
+        sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
         result(nil)
     }
       
