@@ -103,7 +103,7 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 case "tuneNotes":
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
-          let key = args["key"] as? Int,
+          let _ = args["key"] as? Int,  // Note number is available if needed
           let tune = args["tune"] as? Double,
           let channel = args["channel"] as? Int else {
         result(FlutterError(code: "INVALID_ARGUMENTS", message: "Invalid arguments", details: nil))
@@ -117,11 +117,11 @@ case "tuneNotes":
     
     let sampler = samplers[channel]
     
-    // Calculate pitch bend value (limited to ±2 semitones)
+    // Calculate pitch bend value (±2 semitones range)
     let clampedTune = min(max(tune, -2.0), 2.0)
-    let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383)  // Convert to MIDI bend range (0-16383)
+    let bendValue = UInt16((clampedTune / 2.0 * 8192) + 8192)  // Center at 8192
     
-    // Start note with the pitch bend applied
+    // Apply pitch bend to the entire channel
     sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
     
     result(nil)
