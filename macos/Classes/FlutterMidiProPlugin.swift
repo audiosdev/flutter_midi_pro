@@ -101,24 +101,31 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
         result(nil)
 
 case "tuneNotes":
-    let args = call.arguments as! [String: Any]
-    let sfId = args["sfId"] as! Int
-    let tune = args["tune"] as! Double
-
-    guard let samplers = soundfontSamplers[sfId] else {
-        result(FlutterError(code: "SYNTH_NOT_FOUND", message: "Soundfont not found", details: nil))
-        return
+   NSDictionary* args = call.arguments;
+    NSInteger sfId = [args[@"sfId"] integerValue];
+    NSInteger key = [args[@"key"] integerValue];
+    double tune = [args[@"tune"] doubleValue];
+    
+    if (!self.synths[@(sfId)]) {
+        result([FlutterError errorWithCode:@"SYNTH_NOT_FOUND" message:@"Soundfont not found" details:nil]);
+        return;
     }
-
-    // Ensure the tune value is within the expected range of -12 to 12 semitones
-    let clampedTune = max(-12.0, min(12.0, tune))
-
-    // Apply the transpose directly to the samplers
-    for (_, sampler) in samplers.enumerated() {
-        sampler.globalTuning = Float(clampedTune * 100.0) // 100 cents per semitone
+    
+    // Store the tune value for this note
+    self.noteTunes[@(key)] = @(tune);
+    
+    // Convert the dictionary to FluidSynth's expected format
+    double noteTunes[128] = {0};
+    for (NSNumber* note in self.noteTunes) {
+        noteTunes[note.integerValue] = [self.noteTunes[note] doubleValue];
     }
-
-    result(nil)
+    
+    // Apply the tuning
+    fluid_synth_activate_octave_tuning(self.synths[@(sfId)], 0, 0, "tuning", noteTunes, 1);
+    fluid_synth_activate_tuning(self.synths[@(sfId)], 14, 0, 0, 1);
+    fluid_synth_activate_tuning(self.synths[@(sfId)], 15, 0, 0, 1);
+    
+    result(nil);
       
     case "dispose":
         audioEngines.forEach { (key, value) in
