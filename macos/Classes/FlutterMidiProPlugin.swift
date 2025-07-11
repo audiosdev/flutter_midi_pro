@@ -10,6 +10,8 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
   var soundfontIndex = 1
   var soundfontSamplers: [Int: [AVAudioUnitSampler]] = [:]
   var soundfontURLs: [Int: URL] = [:]
+  var soundfontSamplers = [Int: [AVAudioUnitSampler]]()
+  var noteTunes = [Int: Double]()
   
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "flutter_midi_pro", binaryMessenger: registrar.messenger)
@@ -114,7 +116,20 @@ case "tuneNotes":
         return
     }
 
+    // Validate MIDI note range (0-127)
+    guard key >= 0 && key <= 127 else {
+        result(FlutterError(
+            code: "INVALID_NOTE",
+            message: "Key must be between 0 and 127",
+            details: nil
+        ))
+        return
+    }
+
     DispatchQueue.main.async {
+        // Store the tuning for this key
+        self.noteTunes[key] = tune
+        
         // Validate soundfont exists
         guard let samplers = self.soundfontSamplers[sfId] else {
             result(FlutterError(
@@ -125,49 +140,31 @@ case "tuneNotes":
             return
         }
 
-        let channel = 0  // Default channel
-        
-        // Validate channel bounds
-        guard channel >= 0, channel < samplers.count else {
-            result(FlutterError(
-                code: "INVALID_CHANNEL",
-                message: "Channel \(channel) is out of bounds",
-                details: nil
-            ))
-            return
-        }
-
-        let sampler = samplers[channel]
-        
-        // Store the tuning for this key
-        self.noteTunes[key] = tune
-        
-        // Apply tuning to all channels (similar to JNI implementation)
-        for (_, sampler) in samplers.enumerated() {
-            // Convert tune from semitones to cents (FluidSynth uses cents)
+        // Apply tuning to all channels
+        for sampler in samplers {
+            // Convert semitones to cents (100 cents per semitone)
             let tuneInCents = tune * 100.0
             
-            // Create tuning array for all keys (128 notes)
-            var tuning = [Double](repeating: 0.0, count: 128)
-            tuning[key] = tuneInCents
+            // Calculate pitch bend value (±2 semitones range)
+            // MIDI pitch bend range is 0-16383 (center at 8192)
+            let normalized = (tune / 2.0) + 0.5  // Convert -2...+2 to 0...1
+            let bendValue = UInt16(normalized * 16383.0)
             
-            // Apply the tuning (implementation depends on your audio engine)
-            sampler.applyKeyTuning(key: key, tuneInCents: tuneInCents)
+            // Apply to channel 0 (or modify as needed)
+            sampler.sendPitchBend(bendValue, onChannel: 0)
             
-            // Debug output
             print("""
-            Tuning note:
-            - Soundfont ID: \(sfId)
-            - Channel: \(channel)
-            - Key: \(key)
-            - Tune (semitones): \(tune)
-            - Tune (cents): \(tuneInCents)
+            Tuned note:
+            - Soundfont: \(sfId)
+            - Note: \(key)
+            - Tune: \(tune) semitones (\(tuneInCents) cents)
+            - Bend value: \(bendValue)
             """)
         }
         
         result(nil)
     }
-
+      
     case "dispose":
         audioEngines.forEach { (key, value) in
             value.forEach { (audioEngine) in
