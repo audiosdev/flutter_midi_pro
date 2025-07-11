@@ -103,11 +103,10 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
 case "tuneNotes":
     guard let args = call.arguments as? [String: Any],
           let sfId = args["sfId"] as? Int,
-          let _ = args["key"] as? Int,  // Note: key is received but not used
           let tune = args["tune"] as? Double else {
         result(FlutterError(
             code: "INVALID_ARGUMENTS", 
-            message: "Required arguments: sfId (Int), key (Int), tune (Double)",
+            message: "Required arguments: sfId (Int), tune (Double)",
             details: nil
         ))
         return
@@ -116,10 +115,21 @@ case "tuneNotes":
     // Default to channel 0 (since Dart doesn't provide channel parameter)
     let channel = 0
     
-    guard let samplers = soundfontSamplers[sfId], channel < samplers.count else {
+    // Safely access the samplers dictionary
+    guard let samplers = soundfontSamplers[sfId], !samplers.isEmpty else {
         result(FlutterError(
             code: "SYNTH_NOT_FOUND",
-            message: "Soundfont not found or channel unavailable",
+            message: "Soundfont not found for ID: \(sfId)",
+            details: nil
+        ))
+        return
+    }
+    
+    // Ensure channel is within bounds
+    guard channel >= 0, channel < samplers.count else {
+        result(FlutterError(
+            code: "INVALID_CHANNEL",
+            message: "Channel \(channel) is out of bounds for soundfont \(sfId)",
             details: nil
         ))
         return
@@ -127,12 +137,15 @@ case "tuneNotes":
     
     let sampler = samplers[channel]
     
-    // Calculate pitch bend (±2 semitones range)
+    // Calculate pitch bend (±2 semitones range) with safety checks
     let clampedTune = min(max(tune, -2.0), 2.0)
-    let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383)
+    let bendValue = UInt16((clampedTune / 2.0 + 0.5) * 16383.0)
     
-    // Apply to channel 0
-    sampler.sendPitchBend(bendValue, onChannel: UInt8(channel))
+    // Ensure bendValue is within valid range
+    let safeBendValue = min(max(bendValue, 0), 16383)
+    
+    // Apply to channel
+    sampler.sendPitchBend(safeBendValue, onChannel: UInt8(channel))
     
     result(nil)
       
