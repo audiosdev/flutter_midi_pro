@@ -46,11 +46,13 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
                         program: UInt8(program),
                         bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
                         bankLSB: UInt8(bank)
+                    )
                 } catch {
                     result(FlutterError(
                         code: "SOUND_FONT_LOAD_FAILED",
                         message: "Failed to load soundfont for note class \(noteClass)",
-                        details: nil))
+                        details: nil
+                    ))
                     return
                 }
                 samplers.append(sampler)
@@ -62,7 +64,8 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
                 result(FlutterError(
                     code: "AUDIO_ENGINE_START_FAILED",
                     message: "Failed to start audio engine",
-                    details: nil))
+                    details: nil
+                ))
                 return
             }
             
@@ -95,18 +98,21 @@ public class FlutterMidiProPlugin: NSObject, FlutterPlugin {
                         at: soundfontUrl,
                         program: UInt8(program),
                         bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
-                        bankLSB: UInt8(bank))
+                        bankLSB: UInt8(bank)
+                    )
                     
                     sampler.sendProgramChange(
                         UInt8(program),
                         bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
                         bankLSB: UInt8(bank),
-                        onChannel: UInt8(noteClass))
+                        onChannel: UInt8(noteClass)
+                    )
                 } catch {
                     result(FlutterError(
                         code: "INSTRUMENT_CHANGE_FAILED",
                         message: "Failed to change instrument for note class \(noteClass)",
-                        details: nil))
+                        details: nil
+                    ))
                     return
                 }
             }
